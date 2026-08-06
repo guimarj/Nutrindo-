@@ -69,6 +69,12 @@ def main(argv: list[str] | None = None) -> int:
                       help="fração do histórico usada como treino (padrão 0.7)")
     p_bt.add_argument("--simulacoes", type=int, default=10_000)
 
+    p_disp = sub.add_parser("disputa",
+                            help="score de disputa esperada de uma combinação")
+    p_disp.add_argument("--jogo", required=True)
+    p_disp.add_argument("--dezenas", required=True,
+                        help="ex.: 01,02,03,04,05,06")
+
     args = parser.parse_args(argv)
     con = db.conectar(args.db)
     try:
@@ -100,6 +106,19 @@ def main(argv: list[str] | None = None) -> int:
                 backtest.backtest(con, slug, corte=args.corte,
                                   simulacoes=args.simulacoes, log=_log)
                 _log("")
+        elif args.comando == "disputa":
+            from . import popularidade
+            from .config import jogo as _cfg_de
+            cfg = _cfg_de(args.jogo)
+            dezenas = [int(d) for d in args.dezenas.replace(" ", "").split(",")]
+            modelo = popularidade.montar_modelo(db.carregar(con, args.jogo), cfg)
+            mult = modelo.multiplicador(dezenas, cfg)
+            _, feats = modelo.eta(dezenas, cfg)
+            _log(f"modelo: {modelo.origem}")
+            _log(f"multiplicador de disputa: {mult:.2f}× a combinação média")
+            for nome, v in sorted(feats.items(), key=lambda kv: -abs(kv[1])):
+                if abs(v) > 1e-9:
+                    _log(f"  {nome}: {v:+.3f} (β={modelo.betas.get(nome, 0):+.2f})")
     finally:
         con.close()
     return 0
