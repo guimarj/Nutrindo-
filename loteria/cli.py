@@ -51,6 +51,16 @@ def main(argv: list[str] | None = None) -> int:
     p_ana.add_argument("--alfa", type=float, default=0.05,
                        help="limiar de FDR (Benjamini-Hochberg)")
 
+    p_ctl = sub.add_parser("controle",
+                           help="controle negativo: mesma bateria em réplicas "
+                                "sintéticas de RNG criptográfico")
+    p_ctl.add_argument("--jogo", default="todos")
+    p_ctl.add_argument("--replicas", type=int, default=20)
+    p_ctl.add_argument("--janela", type=int, default=250)
+    p_ctl.add_argument("--passo", type=int, default=125)
+    p_ctl.add_argument("--sem-trincas", action="store_true")
+    p_ctl.add_argument("--alfa", type=float, default=0.05)
+
     args = parser.parse_args(argv)
     con = db.conectar(args.db)
     try:
@@ -67,6 +77,14 @@ def main(argv: list[str] | None = None) -> int:
                                  passo=args.passo,
                                  incluir_trincas=not args.sem_trincas,
                                  alfa=args.alfa, log=_log)
+                _log("")
+        elif args.comando == "controle":
+            from . import controle
+            for slug in _jogos_do_argumento(args.jogo):
+                controle.controle_negativo(
+                    con, slug, replicas=args.replicas, janela=args.janela,
+                    passo=args.passo, incluir_trincas=not args.sem_trincas,
+                    alfa=args.alfa, log=_log)
                 _log("")
     finally:
         con.close()
