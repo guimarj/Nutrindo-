@@ -41,6 +41,16 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("status", help="resumo do banco: concursos, lacunas, metadados")
 
+    p_ana = sub.add_parser("analisar", help="bateria forense de aleatoriedade")
+    p_ana.add_argument("--jogo", default="todos")
+    p_ana.add_argument("--janela", type=int, default=250,
+                       help="largura das janelas móveis do qui-quadrado")
+    p_ana.add_argument("--passo", type=int, default=125)
+    p_ana.add_argument("--sem-trincas", action="store_true",
+                       help="pula a análise de trincas (mais rápida)")
+    p_ana.add_argument("--alfa", type=float, default=0.05,
+                       help="limiar de FDR (Benjamini-Hochberg)")
+
     args = parser.parse_args(argv)
     con = db.conectar(args.db)
     try:
@@ -50,6 +60,14 @@ def main(argv: list[str] | None = None) -> int:
                                enriquecer=not args.sem_enriquecer, log=_log)
         elif args.comando == "status":
             ingestao.status(con, log=_log)
+        elif args.comando == "analisar":
+            from . import analise
+            for slug in _jogos_do_argumento(args.jogo):
+                analise.analisar(con, slug, janela=args.janela,
+                                 passo=args.passo,
+                                 incluir_trincas=not args.sem_trincas,
+                                 alfa=args.alfa, log=_log)
+                _log("")
     finally:
         con.close()
     return 0
