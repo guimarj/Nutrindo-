@@ -61,6 +61,14 @@ def main(argv: list[str] | None = None) -> int:
     p_ctl.add_argument("--sem-trincas", action="store_true")
     p_ctl.add_argument("--alfa", type=float, default=0.05)
 
+    p_bt = sub.add_parser("backtest",
+                          help="estratégias históricas vs apostas aleatórias, "
+                               "com split temporal estrito")
+    p_bt.add_argument("--jogo", default="todos")
+    p_bt.add_argument("--corte", type=float, default=0.7,
+                      help="fração do histórico usada como treino (padrão 0.7)")
+    p_bt.add_argument("--simulacoes", type=int, default=10_000)
+
     args = parser.parse_args(argv)
     con = db.conectar(args.db)
     try:
@@ -85,6 +93,12 @@ def main(argv: list[str] | None = None) -> int:
                     con, slug, replicas=args.replicas, janela=args.janela,
                     passo=args.passo, incluir_trincas=not args.sem_trincas,
                     alfa=args.alfa, log=_log)
+                _log("")
+        elif args.comando == "backtest":
+            from . import backtest
+            for slug in _jogos_do_argumento(args.jogo):
+                backtest.backtest(con, slug, corte=args.corte,
+                                  simulacoes=args.simulacoes, log=_log)
                 _log("")
     finally:
         con.close()
