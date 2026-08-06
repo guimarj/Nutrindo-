@@ -75,6 +75,31 @@ def main(argv: list[str] | None = None) -> int:
     p_disp.add_argument("--dezenas", required=True,
                         help="ex.: 01,02,03,04,05,06")
 
+    p_pal = sub.add_parser("palpites", help="gera N jogos otimizados")
+    p_pal.add_argument("--jogo", required=True,
+                       help="megasena, lotofacil, quina ou supersete")
+    p_pal.add_argument("--n", type=int, default=10)
+    p_pal.add_argument("--modo",
+                       choices=["padrao", "conservador", "contrarian",
+                                "fechamento"],
+                       default="padrao")
+    p_pal.add_argument("--orcamento", type=float, default=None,
+                       help="monta a carteira dentro deste valor em R$")
+    p_pal.add_argument("--universo", type=int, default=12,
+                       help="tamanho do universo no modo fechamento")
+    p_pal.add_argument("--volume", type=float, default=None,
+                       help="apostas simples-equivalentes estimadas por concurso")
+    p_pal.add_argument("--premio", type=float, default=None,
+                       help="prêmio principal estimado em R$")
+    p_pal.add_argument("--seed", type=int, default=None,
+                       help="semente para reprodutibilidade do pool")
+
+    sub.add_parser("relatorio", help="gera relatorios/relatorio.html")
+
+    p_vol = sub.add_parser("volantes",
+                           help="gera PDF dos volantes da última carteira")
+    p_vol.add_argument("--jogo", required=True)
+
     args = parser.parse_args(argv)
     con = db.conectar(args.db)
     try:
@@ -119,6 +144,23 @@ def main(argv: list[str] | None = None) -> int:
             for nome, v in sorted(feats.items(), key=lambda kv: -abs(kv[1])):
                 if abs(v) > 1e-9:
                     _log(f"  {nome}: {v:+.3f} (β={modelo.betas.get(nome, 0):+.2f})")
+        elif args.comando == "palpites":
+            from . import gerador
+            from .config import jogo as _cfg_de
+            carteira = gerador.gerar_carteira(
+                con, args.jogo, n=args.n, modo=args.modo,
+                orcamento=args.orcamento, volume=args.volume,
+                premio=args.premio, seed=args.seed,
+                universo_fechamento=args.universo)
+            gerador.imprimir_carteira(carteira, _cfg_de(args.jogo), log=_log)
+            destino = gerador.salvar_carteira(carteira)
+            _log(f"\ncarteira salva em {destino} (use `volantes` para o PDF)")
+        elif args.comando == "relatorio":
+            from . import relatorio
+            relatorio.gerar_html(log=_log)
+        elif args.comando == "volantes":
+            from . import volantes
+            volantes.gerar_pdf(args.jogo, log=_log)
     finally:
         con.close()
     return 0
